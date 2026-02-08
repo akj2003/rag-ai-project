@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  rag-app:
+    build: .
+    container_name: local_ai_app
+    ports:
+      - "8501:8501"
+    environment:
+      # Mac-specific setting to talk to desktop Ollama
+      - OLLAMA_HOST=http://host.docker.internal:11434
+    volumes:
+      - ./chroma_db_persistent:/app/chroma_db_persistent
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

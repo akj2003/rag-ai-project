@@ -1,0 +1,3 @@
+chroma_db_persistent/
+__pycache__/
+.env
