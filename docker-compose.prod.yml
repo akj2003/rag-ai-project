@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # The Web App
   rag-app:
-    image: your_dockerhub_username/rag-ai-suite:latest
+    image: akj2003/rag-ai-suite:latest
     container_name: rag_app
     restart: unless-stopped
     ports:

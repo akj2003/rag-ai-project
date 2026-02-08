@@ -41,7 +41,7 @@ jobs:
           # Pull latest code configurations
           # (You might need to clone repo once manually on server first)
           if [ ! -d "rag-ai-project" ]; then
-            git clone https://github.com/YOUR_GITHUB_USER/rag-ai-project.git
+            git clone https://github.com/akj2003/rag-ai-project.git
           fi
           cd rag-ai-project
           git pull origin main
