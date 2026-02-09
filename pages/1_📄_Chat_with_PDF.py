@@ -1,3 +1,4 @@
+import requests
 import streamlit as st
 import os
 import tempfile
@@ -72,6 +73,12 @@ if uploaded_file:
     
     question_answer_chain = create_stuff_documents_chain(llm, prompt)
     rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+
+    #Ollama API Test
+    response = requests.get(f"{ollama_url}/api/tags")
+    available_models = response.json().get("models", [])
+    model_names = [model["name"] for model in available_models]
+    st.write(f"✅ Ollama is up! Available models: {', '.join(model_names)}")
 
     # 5. Chat Interface
     user_question = st.text_input("Ask a question about your PDF:")
