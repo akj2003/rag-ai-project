@@ -91,7 +91,7 @@ with tab1:
         st.subheader("2. Visual Assets (Optional)")
         st.write("Visuals increase LinkedIn engagement by over 200%. Let the AI map this concept into a flow diagram.")
         
-        # The Optional Diagram Button
+       # The Optional Diagram Button
         if st.button("📊 Generate Flow Diagram"):
             with st.spinner("Translating post concepts into a visual flowchart..."):
                 try:
@@ -103,24 +103,17 @@ with tab1:
                     {post_content}
                     
                     Rules:
-                    1. Output ONLY the Mermaid.js code block.
-                    2. Do NOT say "Here is the code" or add any conversational text.
-                    3. Keep the diagram professional, using standard nodes and clear directional arrows.
-                    4. Limit it to a maximum of 8-10 nodes so it renders cleanly.
+                    1. Output ONLY the Mermaid.js code block. No markdown, no conversational text.
+                    2. Start immediately with 'graph TD'.
+                    3. DO NOT use parentheses () or special characters inside node descriptions unless you wrap the description in double quotes like this: A["Agentic AI (LLM)"]
+                    4. Keep it simple: maximum 8 nodes.
                     """)
                     
                     diagram_chain = diagram_prompt | llm
                     raw_diagram = diagram_chain.invoke({"post_content": st.session_state.linkedin_post}).content
                     
-                    # --- BULLETPROOF CODE EXTRACTION ---
-                    # This strips out any conversational fluff the LLM might have hallucinated
-                    if "```mermaid" in raw_diagram:
-                        clean_code = raw_diagram.split("```mermaid")[1].split("```")[0].strip()
-                    elif "```" in raw_diagram:
-                        clean_code = raw_diagram.split("```")[1].split("```")[0].strip()
-                    else:
-                        clean_code = raw_diagram.strip()
-                        
+                    # --- CLEAN THE CODE ---
+                    clean_code = raw_diagram.replace("```mermaid", "").replace("```", "").strip()
                     st.session_state.mermaid_code = clean_code
                     
                 except Exception as e:
@@ -128,19 +121,28 @@ with tab1:
 
     # Display the diagram if it exists
     if st.session_state.mermaid_code:
-        st.success("Diagram generated! You can take a screenshot of this to attach to your post.")
+        st.success("Diagram generated! Right-click the image below to save it for LinkedIn.")
         
-        # 1. The Debugger: View Raw Code
-        with st.expander("🛠️ View/Edit Raw Mermaid Code (If diagram is blank, check syntax here)"):
+        with st.expander("🛠️ View/Edit Raw Mermaid Code (If diagram has a syntax error)"):
             st.code(st.session_state.mermaid_code, language="mermaid")
-            st.caption("Pro Tip: If the visual fails, copy this code and paste it into [Mermaid Live Editor](https://mermaid.live/) to generate the image.")
-
-        # 2. Render the Diagram (Removed the HTML div wrapper to prevent iframe collapse)
+        
         st.markdown("---")
+        
+        # --- THE BULLETPROOF IMAGE RENDERER ---
         try:
-            st_mermaid(st.session_state.mermaid_code, height=450)
+            # Encode the raw mermaid code into Base64 format
+            graphbytes = st.session_state.mermaid_code.encode("utf-8")
+            base64_bytes = base64.b64encode(graphbytes)
+            base64_string = base64_bytes.decode("utf-8")
+            
+            # Pass it to the Mermaid.ink API to get a pure PNG image back
+            image_url = f"https://mermaid.ink/img/{base64_string}"
+            
+            # Display it as a standard Streamlit image
+            st.image(image_url, caption="AI-Generated Architecture Flow", use_column_width=True)
+            
         except Exception as e:
-            st.error(f"Component Render Error: {e}")
+            st.error("Failed to render the image. Check the raw code in the expander for syntax errors.")
             
 # ==========================================
 # TAB 2: INSTAGRAM CAPTION GENERATOR
