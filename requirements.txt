@@ -14,3 +14,4 @@ psutil
 pillow
 fpdf2>=2.7.0
 streamlit-quill==0.0.3
+streamlit-mermaid>=0.2.0
