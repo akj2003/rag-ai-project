@@ -9,6 +9,7 @@ services:
     environment:
       # Mac-specific setting to talk to desktop Ollama
       - OLLAMA_HOST=http://host.docker.internal:11434
+      - TAVILY_API_KEY=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
     volumes:
       - ./chroma_db_persistent:/app/chroma_db_persistent
     extra_hosts:

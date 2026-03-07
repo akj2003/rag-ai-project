@@ -10,6 +10,7 @@ services:
       - "8501:8501"
     environment:
       - OLLAMA_HOST=http://ollama-service:11434
+      - TAVILY_API_KEY=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
     depends_on:
       - ollama-service
 
