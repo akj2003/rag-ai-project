@@ -103,8 +103,8 @@ with tab1:
                     {post_content}
                     
                     Rules:
-                    1. Output ONLY valid Mermaid.js code. 
-                    2. Do not include markdown formatting like ```mermaid. Just the raw code starting with 'graph TD'.
+                    1. Output ONLY the Mermaid.js code block.
+                    2. Do NOT say "Here is the code" or add any conversational text.
                     3. Keep the diagram professional, using standard nodes and clear directional arrows.
                     4. Limit it to a maximum of 8-10 nodes so it renders cleanly.
                     """)
@@ -112,8 +112,15 @@ with tab1:
                     diagram_chain = diagram_prompt | llm
                     raw_diagram = diagram_chain.invoke({"post_content": st.session_state.linkedin_post}).content
                     
-                    # Clean the output just in case the LLM wraps it in markdown blocks
-                    clean_code = re.sub(r"```mermaid\n|```", "", raw_diagram).strip()
+                    # --- BULLETPROOF CODE EXTRACTION ---
+                    # This strips out any conversational fluff the LLM might have hallucinated
+                    if "```mermaid" in raw_diagram:
+                        clean_code = raw_diagram.split("```mermaid")[1].split("```")[0].strip()
+                    elif "```" in raw_diagram:
+                        clean_code = raw_diagram.split("```")[1].split("```")[0].strip()
+                    else:
+                        clean_code = raw_diagram.strip()
+                        
                     st.session_state.mermaid_code = clean_code
                     
                 except Exception as e:
@@ -122,15 +129,19 @@ with tab1:
     # Display the diagram if it exists
     if st.session_state.mermaid_code:
         st.success("Diagram generated! You can take a screenshot of this to attach to your post.")
-        st.markdown("<div style='background-color: white; padding: 20px; border-radius: 10px;'>", unsafe_allow_html=True)
+        
+        # 1. The Debugger: View Raw Code
+        with st.expander("🛠️ View/Edit Raw Mermaid Code (If diagram is blank, check syntax here)"):
+            st.code(st.session_state.mermaid_code, language="mermaid")
+            st.caption("Pro Tip: If the visual fails, copy this code and paste it into [Mermaid Live Editor](https://mermaid.live/) to generate the image.")
+
+        # 2. Render the Diagram (Removed the HTML div wrapper to prevent iframe collapse)
+        st.markdown("---")
         try:
-            st_mermaid(st.session_state.mermaid_code, height=400)
+            st_mermaid(st.session_state.mermaid_code, height=450)
         except Exception as e:
-            st.warning("Could not render diagram. The AI might have produced invalid syntax.")
-            st.code(st.session_state.mermaid_code) # Fallback to show the code
-        st.markdown("</div>", unsafe_allow_html=True)
-
-
+            st.error(f"Component Render Error: {e}")
+            
 # ==========================================
 # TAB 2: INSTAGRAM CAPTION GENERATOR
 # ==========================================
