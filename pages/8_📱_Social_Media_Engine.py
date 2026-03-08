@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import base64
+import requests
 import re
 from PIL import Image
 from io import BytesIO
@@ -120,6 +121,7 @@ with tab1:
                     st.error(f"Diagram generation failed: {e}")
 
     # Display the diagram if it exists
+    # Display the diagram if it exists
     if st.session_state.mermaid_code:
         st.success("Diagram generated! Right-click the image below to save it for LinkedIn.")
         
@@ -128,22 +130,29 @@ with tab1:
         
         st.markdown("---")
         
-        # --- THE BULLETPROOF IMAGE RENDERER ---
+        # --- THE ROBUST BACKEND IMAGE FETCHER ---
         try:
-            # Encode the raw mermaid code into Base64 format
+            # 1. Encode the raw mermaid code
             graphbytes = st.session_state.mermaid_code.encode("utf-8")
-            base64_bytes = base64.b64encode(graphbytes)
-            base64_string = base64_bytes.decode("utf-8")
+            base64_string = base64.b64encode(graphbytes).decode("utf-8")
             
-            # Pass it to the Mermaid.ink API to get a pure PNG image back
+            # 2. Build the API URL
             image_url = f"https://mermaid.ink/img/{base64_string}"
             
-            # Display it as a standard Streamlit image
-            st.image(image_url, caption="AI-Generated Architecture Flow", use_column_width=True)
+            # 3. Fetch the image securely via backend
+            response = requests.get(image_url)
+            
+            if response.status_code == 200:
+                # Success! Render the image bytes directly (fixes the deprecation warning too)
+                st.image(response.content, caption="AI-Generated Architecture Flow", use_container_width=True)
+            else:
+                # The LLM hallucinated bad syntax
+                st.error(f"Mermaid.ink rejected the syntax (Error {response.status_code}).")
+                st.warning("Open the 'View Raw Mermaid Code' expander above, copy the code, and paste it into https://mermaid.live to see the exact syntax error.")
             
         except Exception as e:
-            st.error("Failed to render the image. Check the raw code in the expander for syntax errors.")
-            
+            st.error(f"Failed to fetch the image: {e}")
+             
 # ==========================================
 # TAB 2: INSTAGRAM CAPTION GENERATOR
 # ==========================================
