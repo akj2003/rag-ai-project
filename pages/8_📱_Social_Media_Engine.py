@@ -92,8 +92,7 @@ with tab1:
         st.subheader("2. Visual Assets (Optional)")
         st.write("Visuals increase LinkedIn engagement by over 200%. Let the AI map this concept into a flow diagram.")
         
-        # The Optional Diagram Button
-        # The Draw.io Export Button
+        # --- THE DRAW.IO GENERATOR ---
         if st.button("📊 Generate Draw.io Diagram"):
             with st.spinner("Extracting concepts and building Draw.io architecture..."):
                 try:
@@ -131,15 +130,16 @@ with tab1:
                             '        <mxCell id="1" parent="0" />'
                         ]
                         
-                        y_position = 40
-                        # Build Nodes and Edges
+                        x_position = 40
+                        # Build Nodes and Edges (Horizontal layout, great for LinkedIn graphics)
                         for i, step in enumerate(steps):
                             node_id = f"node_{i}"
+                            # XML escape characters to prevent corruption
                             safe_text = step.replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
                             
                             # Add the Node (styled with a professional corporate blue)
                             xml_content.append(f'        <mxCell id="{node_id}" value="{safe_text}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=14;" vertex="1" parent="1">')
-                            xml_content.append(f'          <mxGeometry x="280" y="{y_position}" width="240" height="60" as="geometry" />')
+                            xml_content.append(f'          <mxGeometry x="{x_position}" y="100" width="200" height="60" as="geometry" />')
                             xml_content.append('        </mxCell>')
                             
                             # Add the Arrow connecting to the previous node
@@ -150,7 +150,7 @@ with tab1:
                                 xml_content.append('          <mxGeometry relative="1" as="geometry" />')
                                 xml_content.append('        </mxCell>')
                                 
-                            y_position += 120 # Space out the nodes vertically
+                            x_position += 280 # Space out the nodes horizontally
                             
                         # Close the XML tags
                         xml_content.extend([
@@ -169,10 +169,10 @@ with tab1:
                 except Exception as e:
                     st.error(f"Draw.io compilation failed: {e}")
 
-    # Display the Download Button if the code exists
+    # --- RENDER THE DOWNLOAD BUTTON ---
     if "drawio_code" in st.session_state and st.session_state.drawio_code:
         st.markdown("### 📥 Export Architecture Diagram")
-        st.write("Your flow diagram has been generated. Download the file below and open it in **app.diagrams.net** to view, edit, and export it as an image for LinkedIn.")
+        st.info("Your diagram is ready! Download the file below, drag it into **[app.diagrams.net](https://app.diagrams.net/)**, and export it as a high-res PNG for your post.")
         
         # Convert string to bytes for the download button
         drawio_bytes = st.session_state.drawio_code.encode('utf-8')
@@ -180,7 +180,7 @@ with tab1:
         st.download_button(
             label="⬇️ Download .drawio File",
             data=drawio_bytes,
-            file_name="LinkedIn_Post_Architecture.drawio",
+            file_name="LinkedIn_Architecture_Flow.drawio",
             mime="application/xml"
         )
 # ==========================================
