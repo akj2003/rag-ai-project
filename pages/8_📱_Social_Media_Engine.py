@@ -92,67 +92,78 @@ with tab1:
         st.subheader("2. Visual Assets (Optional)")
         st.write("Visuals increase LinkedIn engagement by over 200%. Let the AI map this concept into a flow diagram.")
         
-       # The Optional Diagram Button
+        # The Optional Diagram Button
         if st.button("📊 Generate Flow Diagram"):
-            with st.spinner("Translating post concepts into a visual flowchart..."):
+            with st.spinner("Extracting concepts and building flowchart..."):
                 try:
                     llm = get_text_llm()
+                    
+                    # 1. Ask the AI for a simple list, NOT code.
                     diagram_prompt = PromptTemplate.from_template("""
-                    Analyze the following LinkedIn post and create a Mermaid.js Flowchart (graph TD) that visually represents the core concepts, architecture, or workflow described.
+                    Read this LinkedIn post and extract a linear sequence of 3 to 5 core concepts or steps.
+                    Output ONLY a single line of text, with each step separated by a pipe character (|).
                     
-                    LinkedIn Post:
-                    {post_content}
+                    Example Output:
+                    Legacy Tech Debt | AI Integration Strategy | Automated Pipelines | Massive ROI
                     
-                    Rules:
-                    1. Output ONLY the Mermaid.js code block. No markdown, no conversational text.
-                    2. Start immediately with 'graph TD'.
-                    3. DO NOT use parentheses () or special characters inside node descriptions unless you wrap the description in double quotes like this: A["Agentic AI (LLM)"]
-                    4. Keep it simple: maximum 8 nodes.
+                    Do not add numbers, bullets, markdown, or explanations. Just the pipe-separated text.
+                    
+                    Post: {post_content}
                     """)
                     
                     diagram_chain = diagram_prompt | llm
-                    raw_diagram = diagram_chain.invoke({"post_content": st.session_state.linkedin_post}).content
+                    raw_steps = diagram_chain.invoke({"post_content": st.session_state.linkedin_post}).content
                     
-                    # --- CLEAN THE CODE ---
-                    clean_code = raw_diagram.replace("```mermaid", "").replace("```", "").strip()
-                    st.session_state.mermaid_code = clean_code
+                    # 2. Clean the AI's output
+                    # Remove random markdown the AI might have added, and split by the pipe |
+                    cleaned_string = raw_steps.replace('`', '').replace('**', '').replace('\n', '')
+                    steps = [step.strip() for step in cleaned_string.split('|') if step.strip()]
                     
+                    # 3. Let PYTHON build the Mermaid code so the syntax is flawlessly perfect
+                    if len(steps) > 1:
+                        mermaid_lines = ["graph TD"]
+                        # Create the nodes
+                        for i in range(len(steps)):
+                            node_id = chr(65 + i) # A, B, C, D...
+                            # Strip out any characters that crash Mermaid
+                            safe_text = steps[i].replace('[', '').replace(']', '').replace('"', '').replace('(', '').replace(')', '')
+                            mermaid_lines.append(f'    {node_id}["{safe_text}"]')
+                            
+                        # Create the arrows
+                        for i in range(len(steps) - 1):
+                            mermaid_lines.append(f'    {chr(65+i)} --> {chr(65+i+1)}')
+                            
+                        st.session_state.mermaid_code = "\n".join(mermaid_lines)
+                    else:
+                        st.error("The AI failed to extract distinct steps. Try generating the text post again.")
+                        st.session_state.mermaid_code = ""
+                        
                 except Exception as e:
-                    st.error(f"Diagram generation failed: {e}")
+                    st.error(f"Diagram extraction failed: {e}")
 
-    # Display the diagram if it exists
-    # Display the diagram if it exists
+    # Display the diagram if we successfully built the code
     if st.session_state.mermaid_code:
-        st.success("Diagram generated! Right-click the image below to save it for LinkedIn.")
+        st.success("✨ Diagram successfully compiled! Right-click the image to save it.")
         
-        with st.expander("🛠️ View/Edit Raw Mermaid Code (If diagram has a syntax error)"):
+        with st.expander("🛠️ View Compiled Mermaid Code"):
             st.code(st.session_state.mermaid_code, language="mermaid")
         
         st.markdown("---")
         
-        # --- THE ROBUST BACKEND IMAGE FETCHER ---
+        # --- NEW RENDERER: QUICKCHART.IO ---
         try:
-            # 1. Encode the raw mermaid code
-            graphbytes = st.session_state.mermaid_code.encode("utf-8")
-            base64_string = base64.b64encode(graphbytes).decode("utf-8")
+            # Quickchart allows clean POST requests, which are much more stable
+            url = "https://quickchart.io/mermaid"
+            payload = {"graph": st.session_state.mermaid_code}
             
-            # 2. Build the API URL
-            image_url = f"https://mermaid.ink/img/{base64_string}"
-            
-            # 3. Fetch the image securely via backend
-            response = requests.get(image_url)
+            response = requests.post(url, json=payload)
             
             if response.status_code == 200:
-                # Success! Render the image bytes directly (fixes the deprecation warning too)
                 st.image(response.content, caption="AI-Generated Architecture Flow", use_container_width=True)
             else:
-                # The LLM hallucinated bad syntax
-                st.error(f"Mermaid.ink rejected the syntax (Error {response.status_code}).")
-                st.warning("Open the 'View Raw Mermaid Code' expander above, copy the code, and paste it into https://mermaid.live to see the exact syntax error.")
-            
+                st.error(f"QuickChart API Error {response.status_code}: Could not render image.")
         except Exception as e:
-            st.error(f"Failed to fetch the image: {e}")
-             
+            st.error(f"Failed to reach QuickChart API: {e}")
 # ==========================================
 # TAB 2: INSTAGRAM CAPTION GENERATOR
 # ==========================================
