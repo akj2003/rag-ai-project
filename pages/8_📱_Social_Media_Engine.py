@@ -93,12 +93,13 @@ with tab1:
         st.write("Visuals increase LinkedIn engagement by over 200%. Let the AI map this concept into a flow diagram.")
         
         # The Optional Diagram Button
-        if st.button("📊 Generate Flow Diagram"):
-            with st.spinner("Extracting concepts and building flowchart..."):
+        # The Draw.io Export Button
+        if st.button("📊 Generate Draw.io Diagram"):
+            with st.spinner("Extracting concepts and building Draw.io architecture..."):
                 try:
                     llm = get_text_llm()
                     
-                    # 1. Ask the AI for a simple list, NOT code.
+                    # 1. Ask the AI for a simple list of concepts
                     diagram_prompt = PromptTemplate.from_template("""
                     Read this LinkedIn post and extract a linear sequence of 3 to 5 core concepts or steps.
                     Output ONLY a single line of text, with each step separated by a pipe character (|).
@@ -115,55 +116,73 @@ with tab1:
                     raw_steps = diagram_chain.invoke({"post_content": st.session_state.linkedin_post}).content
                     
                     # 2. Clean the AI's output
-                    # Remove random markdown the AI might have added, and split by the pipe |
                     cleaned_string = raw_steps.replace('`', '').replace('**', '').replace('\n', '')
                     steps = [step.strip() for step in cleaned_string.split('|') if step.strip()]
                     
-                    # 3. Let PYTHON build the Mermaid code so the syntax is flawlessly perfect
+                    # 3. Mathematically build the Draw.io XML structure
                     if len(steps) > 1:
-                        mermaid_lines = ["graph TD"]
-                        # Create the nodes
-                        for i in range(len(steps)):
-                            node_id = chr(65 + i) # A, B, C, D...
-                            # Strip out any characters that crash Mermaid
-                            safe_text = steps[i].replace('[', '').replace(']', '').replace('"', '').replace('(', '').replace(')', '')
-                            mermaid_lines.append(f'    {node_id}["{safe_text}"]')
+                        # Draw.io required XML headers
+                        xml_content = [
+                            '<mxfile host="app.diagrams.net" agent="Streamlit">',
+                            '  <diagram id="ai_flow" name="LinkedIn_Architecture">',
+                            '    <mxGraphModel dx="1000" dy="1000" grid="1" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" math="0" shadow="0">',
+                            '      <root>',
+                            '        <mxCell id="0" />',
+                            '        <mxCell id="1" parent="0" />'
+                        ]
+                        
+                        y_position = 40
+                        # Build Nodes and Edges
+                        for i, step in enumerate(steps):
+                            node_id = f"node_{i}"
+                            safe_text = step.replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
                             
-                        # Create the arrows
-                        for i in range(len(steps) - 1):
-                            mermaid_lines.append(f'    {chr(65+i)} --> {chr(65+i+1)}')
+                            # Add the Node (styled with a professional corporate blue)
+                            xml_content.append(f'        <mxCell id="{node_id}" value="{safe_text}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=14;" vertex="1" parent="1">')
+                            xml_content.append(f'          <mxGeometry x="280" y="{y_position}" width="240" height="60" as="geometry" />')
+                            xml_content.append('        </mxCell>')
                             
-                        st.session_state.mermaid_code = "\n".join(mermaid_lines)
+                            # Add the Arrow connecting to the previous node
+                            if i > 0:
+                                prev_id = f"node_{i-1}"
+                                edge_id = f"edge_{i}"
+                                xml_content.append(f'        <mxCell id="{edge_id}" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;" edge="1" parent="1" source="{prev_id}" target="{node_id}">')
+                                xml_content.append('          <mxGeometry relative="1" as="geometry" />')
+                                xml_content.append('        </mxCell>')
+                                
+                            y_position += 120 # Space out the nodes vertically
+                            
+                        # Close the XML tags
+                        xml_content.extend([
+                            '      </root>',
+                            '    </mxGraphModel>',
+                            '  </diagram>',
+                            '</mxfile>'
+                        ])
+                        
+                        st.session_state.drawio_code = "\n".join(xml_content)
+                        st.success("✨ Draw.io file successfully compiled!")
                     else:
                         st.error("The AI failed to extract distinct steps. Try generating the text post again.")
-                        st.session_state.mermaid_code = ""
+                        st.session_state.drawio_code = ""
                         
                 except Exception as e:
-                    st.error(f"Diagram extraction failed: {e}")
+                    st.error(f"Draw.io compilation failed: {e}")
 
-    # Display the diagram if we successfully built the code
-    if st.session_state.mermaid_code:
-        st.success("✨ Diagram successfully compiled! Right-click the image to save it.")
+    # Display the Download Button if the code exists
+    if "drawio_code" in st.session_state and st.session_state.drawio_code:
+        st.markdown("### 📥 Export Architecture Diagram")
+        st.write("Your flow diagram has been generated. Download the file below and open it in **app.diagrams.net** to view, edit, and export it as an image for LinkedIn.")
         
-        with st.expander("🛠️ View Compiled Mermaid Code"):
-            st.code(st.session_state.mermaid_code, language="mermaid")
+        # Convert string to bytes for the download button
+        drawio_bytes = st.session_state.drawio_code.encode('utf-8')
         
-        st.markdown("---")
-        
-        # --- NEW RENDERER: QUICKCHART.IO ---
-        try:
-            # Quickchart allows clean POST requests, which are much more stable
-            url = "https://quickchart.io/mermaid"
-            payload = {"graph": st.session_state.mermaid_code}
-            
-            response = requests.post(url, json=payload)
-            
-            if response.status_code == 200:
-                st.image(response.content, caption="AI-Generated Architecture Flow", use_container_width=True)
-            else:
-                st.error(f"QuickChart API Error {response.status_code}: Could not render image.")
-        except Exception as e:
-            st.error(f"Failed to reach QuickChart API: {e}")
+        st.download_button(
+            label="⬇️ Download .drawio File",
+            data=drawio_bytes,
+            file_name="LinkedIn_Post_Architecture.drawio",
+            mime="application/xml"
+        )
 # ==========================================
 # TAB 2: INSTAGRAM CAPTION GENERATOR
 # ==========================================
