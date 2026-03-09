@@ -3,12 +3,13 @@ import os
 import base64
 import requests
 import re
+import boto3
+import json
 from PIL import Image
 from io import BytesIO
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
-from streamlit_mermaid import st_mermaid
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Social Media Engine", page_icon="📱", layout="wide")
@@ -37,8 +38,6 @@ def get_vision_llm():
 # --- STATE MANAGEMENT ---
 if "linkedin_post" not in st.session_state:
     st.session_state.linkedin_post = ""
-if "mermaid_code" not in st.session_state:
-    st.session_state.mermaid_code = ""
 
 # --- UI TABS ---
 tab1, tab2 = st.tabs(["💼 LinkedIn (Thought Leadership)", "📸 Instagram (Visual Storytelling)"])
@@ -92,97 +91,79 @@ with tab1:
         st.subheader("2. Visual Assets (Optional)")
         st.write("Visuals increase LinkedIn engagement by over 200%. Let the AI map this concept into a flow diagram.")
         
-        # --- THE DRAW.IO GENERATOR ---
-        if st.button("📊 Generate Draw.io Diagram"):
-            with st.spinner("Extracting concepts and building Draw.io architecture..."):
+        # --- NEW: AWS BEDROCK RICH IMAGE GENERATOR ---
+        st.markdown("---")
+        st.markdown("### 🎨 Generate Rich Visuals (AWS Bedrock)")
+        st.write("Generate a high-fidelity conceptual image using Amazon Titan or Stable Diffusion.")
+        
+        if st.button("🌌 Generate Rich Image"):
+            with st.spinner("Commanding Llama 3.2 to write the prompt, and Bedrock to render the image..."):
                 try:
+                    # 1. Use local Llama 3.2 to write a highly optimized image generation prompt
                     llm = get_text_llm()
+                    img_prompt_template = PromptTemplate.from_template("""
+                    You are an expert AI image prompt engineer. Read this LinkedIn post and write a highly detailed, 
+                    professional, and corporate image generation prompt that perfectly captures the core theme.
                     
-                    # 1. Ask the AI for a simple list of concepts
-                    diagram_prompt = PromptTemplate.from_template("""
-                    Read this LinkedIn post and extract a linear sequence of 3 to 5 core concepts or steps.
-                    Output ONLY a single line of text, with each step separated by a pipe character (|).
-                    
-                    Example Output:
-                    Legacy Tech Debt | AI Integration Strategy | Automated Pipelines | Massive ROI
-                    
-                    Do not add numbers, bullets, markdown, or explanations. Just the pipe-separated text.
+                    Rules:
+                    1. Keep it under 400 characters.
+                    2. Specify a professional, high-tech corporate aesthetic (e.g., "cinematic lighting, sleek 3D render, enterprise technology").
+                    3. DO NOT ask for any text, letters, or words in the image (AI is bad at spelling).
+                    4. Output ONLY the raw prompt.
                     
                     Post: {post_content}
                     """)
                     
-                    diagram_chain = diagram_prompt | llm
-                    raw_steps = diagram_chain.invoke({"post_content": st.session_state.linkedin_post}).content
+                    img_chain = img_prompt_template | llm
+                    generated_prompt = img_chain.invoke({"post_content": st.session_state.linkedin_post}).content.strip()
                     
-                    # 2. Clean the AI's output
-                    cleaned_string = raw_steps.replace('`', '').replace('**', '').replace('\n', '')
-                    steps = [step.strip() for step in cleaned_string.split('|') if step.strip()]
+                    st.info(f"**Optimized Prompt sent to AWS:** {generated_prompt}")
                     
-                    # 3. Mathematically build the Draw.io XML structure
-                    if len(steps) > 1:
-                        # Draw.io required XML headers
-                        xml_content = [
-                            '<mxfile host="app.diagrams.net" agent="Streamlit">',
-                            '  <diagram id="ai_flow" name="LinkedIn_Architecture">',
-                            '    <mxGraphModel dx="1000" dy="1000" grid="1" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" math="0" shadow="0">',
-                            '      <root>',
-                            '        <mxCell id="0" />',
-                            '        <mxCell id="1" parent="0" />'
-                        ]
-                        
-                        x_position = 40
-                        # Build Nodes and Edges (Horizontal layout, great for LinkedIn graphics)
-                        for i, step in enumerate(steps):
-                            node_id = f"node_{i}"
-                            # XML escape characters to prevent corruption
-                            safe_text = step.replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
-                            
-                            # Add the Node (styled with a professional corporate blue)
-                            xml_content.append(f'        <mxCell id="{node_id}" value="{safe_text}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=14;" vertex="1" parent="1">')
-                            xml_content.append(f'          <mxGeometry x="{x_position}" y="100" width="200" height="60" as="geometry" />')
-                            xml_content.append('        </mxCell>')
-                            
-                            # Add the Arrow connecting to the previous node
-                            if i > 0:
-                                prev_id = f"node_{i-1}"
-                                edge_id = f"edge_{i}"
-                                xml_content.append(f'        <mxCell id="{edge_id}" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;" edge="1" parent="1" source="{prev_id}" target="{node_id}">')
-                                xml_content.append('          <mxGeometry relative="1" as="geometry" />')
-                                xml_content.append('        </mxCell>')
-                                
-                            x_position += 280 # Space out the nodes horizontally
-                            
-                        # Close the XML tags
-                        xml_content.extend([
-                            '      </root>',
-                            '    </mxGraphModel>',
-                            '  </diagram>',
-                            '</mxfile>'
-                        ])
-                        
-                        st.session_state.drawio_code = "\n".join(xml_content)
-                        st.success("✨ Draw.io file successfully compiled!")
-                    else:
-                        st.error("The AI failed to extract distinct steps. Try generating the text post again.")
-                        st.session_state.drawio_code = ""
-                        
+                    # 2. Call AWS Bedrock to generate the image
+                    # Note: Ensure your region matches where you requested Bedrock model access (e.g., us-east-1)
+                    bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1') 
+                    
+                    # Payload configured for Amazon Titan Image Generator v1
+                    payload = {
+                        "taskType": "TEXT_IMAGE",
+                        "textToImageParams": {
+                            "text": generated_prompt
+                        },
+                        "imageGenerationConfig": {
+                            "numberOfImages": 1,
+                            "quality": "standard",
+                            "cfgScale": 8.0,
+                            "height": 1024,
+                            "width": 1024,
+                            "seed": 0 # Random seed for unique images
+                        }
+                    }
+                    
+                    response = bedrock_client.invoke_model(
+                        modelId="amazon.titan-image-generator-v1",
+                        contentType="application/json",
+                        accept="application/json",
+                        body=json.dumps(payload)
+                    )
+                    
+                    # 3. Decode and Display the Image
+                    response_body = json.loads(response.get('body').read())
+                    base64_image = response_body.get('images')[0]
+                    image_bytes = base64.b64decode(base64_image)
+                    
+                    st.success("✨ Rich image successfully generated by AWS Bedrock!")
+                    st.image(image_bytes, caption="Generated via Amazon Titan", use_container_width=True)
+                    
+                    st.download_button(
+                        label="⬇️ Download High-Res Image",
+                        data=image_bytes,
+                        file_name="LinkedIn_Rich_Graphic.png",
+                        mime="image/png"
+                    )
+                    
                 except Exception as e:
-                    st.error(f"Draw.io compilation failed: {e}")
-
-    # --- RENDER THE DOWNLOAD BUTTON ---
-    if "drawio_code" in st.session_state and st.session_state.drawio_code:
-        st.markdown("### 📥 Export Architecture Diagram")
-        st.info("Your diagram is ready! Download the file below, drag it into **[app.diagrams.net](https://app.diagrams.net/)**, and export it as a high-res PNG for your post.")
-        
-        # Convert string to bytes for the download button
-        drawio_bytes = st.session_state.drawio_code.encode('utf-8')
-        
-        st.download_button(
-            label="⬇️ Download .drawio File",
-            data=drawio_bytes,
-            file_name="LinkedIn_Architecture_Flow.drawio",
-            mime="application/xml"
-        )
+                    st.error(f"AWS Bedrock generation failed. Did you enable Model Access in the AWS Console? Error details: {e}")
+                    
 # ==========================================
 # TAB 2: INSTAGRAM CAPTION GENERATOR
 # ==========================================
