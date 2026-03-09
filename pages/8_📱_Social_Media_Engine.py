@@ -199,7 +199,7 @@ with tab2:
             with st.spinner("Analyzing image and generating caption..."):
                 try:
                     image_bytes = uploaded_image.read()
-                    st.image(image_bytes, caption="Uploaded Image", use_column_width=True)
+                    st.image(image_bytes, caption="Generated via Amazon Titan", use_container_width=True)
                     
                     base64_image = base64.b64encode(image_bytes).decode("utf-8")
                     llm = get_vision_llm()
