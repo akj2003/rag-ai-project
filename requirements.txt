@@ -14,3 +14,4 @@ psutil
 pillow
 fpdf2>=2.7.0
 streamlit-quill==0.0.3
+boto3>=1.34.0
