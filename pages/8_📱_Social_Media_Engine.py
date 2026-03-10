@@ -157,7 +157,7 @@ with tab1:
                         }
                         
                         response = bedrock_client.invoke_model(
-                            modelId="amazon.titan-image-generator-v1",
+                            modelId="amazon.titan-image-generator-v2:0",
                             contentType="application/json",
                             accept="application/json",
                             body=json.dumps(payload)
