@@ -142,17 +142,21 @@ with tab1:
                         llm = get_text_llm()
                         img_prompt_template = PromptTemplate.from_template("""
                         Write a highly detailed, professional image generation prompt based on this post.
-                        Rules: Under 400 characters. Corporate aesthetic. NO text/words in the image. ONLY output the prompt.
+                        Rules: Under 400 characters. Corporate aesthetic. NO text/words in the image. 
+                        CRITICAL: Output ONLY the raw prompt. Do not say "Here is the prompt" or use quotation marks.
                         Post: {post_content}
                         """)
-                        generated_prompt = (img_prompt_template | llm).invoke({"post_content": st.session_state.linkedin_post}).content.strip()
+                        raw_generated_prompt = (img_prompt_template | llm).invoke({"post_content": st.session_state.linkedin_post}).content.strip()
                         
-                        st.info(f"**Prompt:** {generated_prompt}")
+                        # Strip out conversational fluff if the AI hallucinates it
+                        clean_prompt = raw_generated_prompt.replace("Here is a detailed image generation prompt based on the provided text:", "").replace('"', '').strip()
+                        
+                        st.info(f"**Prompt:** {clean_prompt}")
                         
                         bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1') 
                         payload = {
                             "taskType": "TEXT_IMAGE",
-                            "textToImageParams": {"text": generated_prompt},
+                            "textToImageParams": {"text": clean_prompt},
                             "imageGenerationConfig": {"numberOfImages": 1, "quality": "standard", "cfgScale": 8.0, "height": 1024, "width": 1024, "seed": 0}
                         }
                         
@@ -167,12 +171,15 @@ with tab1:
                         image_bytes = base64.b64decode(response_body.get('images')[0])
                         
                         st.success("✨ Image generated!")
-                        # FIXED: Changed from use_column_width to use_container_width to clear the yellow warning
+                        
+                        # FIXED PARAMETER: use_container_width
                         st.image(image_bytes, caption="Generated via Amazon Titan", use_container_width=True)
+                        
                         st.download_button("⬇️ Download Image", data=image_bytes, file_name="LinkedIn_Graphic.png", mime="image/png")
                     except Exception as e:
-                        st.error(f"AWS Bedrock failed. Check IAM permissions. Error: {e}")
-
+                        # Updated error message to be more accurate
+                        st.error(f"AWS Bedrock generation failed. Error details: {e}")
+                        
 # ==========================================
 # TAB 2: INSTAGRAM CAPTION GENERATOR
 # ==========================================
